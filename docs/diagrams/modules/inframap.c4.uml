@@ -1,0 +1,160 @@
+@startuml
+!theme metal
+!include  https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+!define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons2
+!define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+
+!define GCPPuml https://raw.githubusercontent.com/davidholsgrove/gcp-icons-for-plantuml/master/dist
+
+!includeurl GCPPuml/GCPCommon.puml
+!includeurl GCPPuml/Compute/all.puml
+!includeurl GCPPuml/DataAnalytics/CloudPubSub.puml
+!includeurl GCPPuml/Databases/CloudFirestore.puml
+!includeurl GCPPuml/DeveloperTools/CloudScheduler.puml
+
+
+!include DEVICONS/react_original.puml
+!include DEVICONS/nestjs.puml
+!include DEVICONS/firebase.puml
+
+!include FONTAWESOME/users.puml
+
+
+AddRelTag("async", $lineStyle = DashedLine())
+
+Person(users, "Moradores", "Moradores dos condomínios", $sprite="users")
+Person(admins, "Administradores", "Administradores dos condomínios", $sprite="users")
+
+
+Container(web, "Aplicação web", "Next.js", "Sistema de interface gráfica para usuários dos navegadores", $sprite="react_original")
+Container(mobile, "Aplicação Mobile", "React Native", "Sistema de interface gráfica para usuários mobile", $sprite="react_original")
+
+Rel(admins, web, "Gerenciam o condomínio por")
+Rel(users, mobile, "Utilizam")
+
+
+System_Boundary(registry_module, "Módulo de registro") {
+   Container(registry_api, "API de registro", "Nest.js", "API responsável por registrar a autenticar contas de usuários e condomínios", $sprite="nestjs")
+
+   ContainerDb(registry_db, "Repositório de usuários e condomínios", "CockroachDB", "Banco de dados que armazena informações de registro do condomínio e dos usuários")
+   ContainerDb(key_db, "Repositório de chaves", "Firestore", "Banco de dados que armazena as chaves usadas em processo de segurança", $sprite="CloudFirestore,scale=0.35")
+
+   Container(create_key_manager, "Função de criação de chaves", "Cloud function", "Função dedicada a criar chaves no registro de chaves", $sprite="CloudFunctions,scale=0.35")
+   Container(refresh_key_manager, "Função de atualização de valores de chaves", "Cloud function", "Função dedicada a atualizar os valores das chaves no registro de chaves", $sprite="CloudFunctions,scale=0.35")
+
+   Container(update_key_scheduler, "Scheduler de atualização de chave", "Scheduler dedicado a atualizar as chaves do repositório", "Cloud function", $sprite="CloudScheduler,scale=0.35")
+
+   ContainerQueue(delete_member_topic, "Cloud pub/sub", "Tópico: delete member", "Remoção de membros do condomínio", $sprite="CloudPubSub,scale=0.35")
+   ContainerQueue(delete_condominium_topic, "Cloud pub/sub", "Tópico: delete condominium", "Remoção do condomínio", $sprite="CloudPubSub,scale=0.35")
+   ContainerQueue(delete_user_topic, "Cloud pub/sub", "Tópico: delete user", "Remoção do usuário", $sprite="CloudPubSub,scale=0.35")
+
+   Container(auth_gateway, "Gateway de autorização", "Cloud function", "Função dedicada a autorizar os clients no sistema", $sprite="CloudFunctions,scale=0.35")
+
+
+   Rel(web, registry_api, "Registra ou autentica os usuários por", "HTTP/JSON")
+   Rel(mobile, registry_api, "Registra ou autentica os usuários por", "HTTP/JSON")
+
+   Rel(web, auth_gateway, "Autoriza e rediciona para o serviço desejado", "HTTP/JSON")
+   Rel(mobile, auth_gateway, "Autoriza e rediciona para o serviço desejado", "HTTP/JSON")
+
+   Rel(registry_api, registry_db, "Armazena os registros do condomínio e usuários em", "SSL")
+
+   Rel(auth_gateway, key_db, "Consulta as assinaturas dos tokens em", "HTTP/JSON")
+   Rel(key_db, registry_api, "Informa em tempo real os valores das chaves", "GRPC", , $tags = "async")
+
+   Rel(create_key_manager, key_db, "Armazena as chaves no registro de chaves e assinatures", "GRPC")
+   Rel(refresh_key_manager, key_db, "Atualiza os valores das chaves no registro de chaves e assinatures", "GRPC")
+
+   Rel(update_key_scheduler, refresh_key_manager, "Atualiza as chaves periodicamente por", "HTTP/JSON", $tags = "async")
+   Rel(auth_gateway, registry_db, "Consulta os registros de usuários em", "HTTP/JSON")
+
+   Rel(registry_api, delete_member_topic, "Evento informativo de deleção de membros do registro do condomínio", "JSON", $tags = "async")
+   Rel(registry_api, delete_condominium_topic, "Evento informativo de deleção do condomínio", "JSON", $tags = "async")
+   Rel(registry_api, delete_user_topic, "Evento informativo de deleção do usuário", "JSON", $tags = "async")
+}
+
+
+
+
+
+
+System_Boundary(email_module, "Módulo de envio de email") {
+   Container(email_func, "Função de envio de email", "Cloud function", "Função dedicada a enviar emails para os usuários", $sprite="CloudFunctions,scale=0.35")
+   ContainerDb(email_template_db, "Repositório de template de emails", "Firestore", "Banco de dados que armazena as informações dos templates de emails", $sprite="CloudFirestore,scale=0.35")
+
+   Rel(registry_api, email_func, "Dispara emails através de", "HTTP/JSON")
+   Rel(email_func, email_template_db, "Consulta os templates de emails em", "GRPC")
+}
+
+
+
+
+
+
+
+
+System_Boundary(notification_module, "Módulo de notificação") {
+   Container(notification_api, "API de notificações", "Nest.js", "API responsável por disparar notificações para a base de usuários", $sprite="nestjs")
+   Container(notification_message_service, "Disparador de notificações", "FCM", "Serviço responsável por disparar as notificações nos dispositivos dos usuários", $sprite="firebase")
+   ContainerDb(notification_db, "Repositório de notificações", "Firestore", "Repositório responsável por armazenar informações sobre as notificações dos usuários", $sprite="CloudFirestore,scale=0.35")
+
+    Rel(notification_db, delete_member_topic, "Deleta recursos remanescentes dos membros do condomínio", "JSON", $tags = "async")
+    Rel(notification_db, delete_condominium_topic, "Deleta recursos remanescentes do condomínio", "JSON", $tags = "async")
+    Rel(notification_db, delete_user_topic, "Deleta recursos remanescentes do usuário", "JSON", $tags = "async")
+
+    Rel(auth_gateway, notification_api, "Redireciona para o serviço de notificações", "HTTP/JSON")
+    Rel(notification_message_service, mobile, "Gerencia as notificações dos usuários por meio do", "HTTP/JSON", $tags = "async")
+
+    Rel(notification_api, notification_db, "Armazena as notificações em", "GRPC")
+    Rel(notification_api, notification_message_service, "Dispara as notificações em", "HTTP", $tags = "async")
+}
+
+
+System_Boundary(events_manager, "Módulo de gestão de eventos") {
+   Container(event_manager_api, "API de gerenciamento de eventos", "Nest.js", "Sistema dedicado a gerenciar eventos marcados pelos administradores", $sprite="nestjs")
+   ContainerDb(event_manager_db, "Repositório de eventos", "Firestore", "Banco de dados dedicado a armazenar eventos definidos pelos administradores", $sprite="CloudFirestore,scale=0.35")
+
+   Rel(auth_gateway, event_manager_api, "Redireciona para o serviço de eventos", "HTTP/JSON")
+   Rel(event_manager_api, event_manager_db, "Armazena os eventos em", "GRPC")
+   Rel(event_manager_api, notification_api, "Dispara as notificações de criação dos eventos aos usuários envolvidos", "HTTP/JSON")
+
+   Rel(event_manager_db, delete_condominium_topic, "Deleta recursos remanescentes do condomínio", "HTTP/JSON", $tags="async")
+}
+
+
+System_Boundary(help_desk, "Módulo de help desk") {
+   Container(help_desk_api, "API de help desk", "Nest.js", "Serviço dedicado a gerenciar o suporte ao usuário com o software", $sprite="nestjs")
+   ContainerDb(help_desk_db, "Repositório do help desk", "Firestore", "Banco de dados dedicado a armazenar informações sobre o suporte ao usuário", $sprite="CloudFirestore,scale=0.35")
+
+   Rel(web, help_desk_api, "Envia tickets e solicita suporte em", "HTTP/JSON")
+   Rel(mobile, help_desk_api, "Envia tickets e solicita suporte em", "HTTP/JSON")
+
+   Rel(help_desk_api, help_desk_db, "Armazena tickets em", "GRPC")
+   Rel(help_desk_api, email_func, "Notifica o usuário em", "HTTP/JSON")
+}
+
+
+System_Boundary(booking, "Módulo de reserva de espaços") {
+   Container(booking_api, "API de reserva de espaços", "Serviço dedicado a gerenciar as reservas de espaços dos usuários", $sprite="nestjs")
+   ContainerDb(booking_db, "Repositório de reserva de espaços", "Firestore", "Banco de dados dedicado a armazenar informações sobre as reservas de espaços", $sprite="CloudFirestore,scale=0.35")
+
+   Rel(auth_gateway, booking_api, "Redireciona para o serviço de reserva de espaços", "HTTP/JSON")
+   Rel(booking_api, booking_db, "Armazena informações sobre as reservas de espaços em", "GRPC")
+   Rel(booking_api, notification_api, "Dispara as notificações sobre reservas de espaços em", "HTTP/JSON")
+   Rel(booking_db, delete_condominium_topic, "Deleta recursos remanescentes do condomínio", "JSON", $tags = "async")
+}
+
+
+System_Boundary(invitees_handler, "Módulo de visitantes") {
+   Container(invitees_api, "API de gerenciamento de visitantes", "Nest.js", "Serviço dedicado a lidar com visitantes nos condomínios", $sprite="nestjs")
+   ContainerDb(invitees_db, "Repositório de visitantes", "Firestore", "Serviço dedicado a armazenar informações dos visitantes", $sprite="CloudFirestore,scale=0.35")
+
+
+   Rel(invitees_db, delete_condominium_topic, "Deleta recursos remanescentes do condomínio", "JSON", $tags = "async")
+   Rel(auth_gateway, invitees_api, "Redireciona para o serviço de gerenciamento do visitas", "HTTP/JSON")
+   Rel(invitees_api, invitees_db, "Armazena as informações dos visitantes em", "HTTP/JSON")
+
+      
+}
+@enduml
