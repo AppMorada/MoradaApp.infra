@@ -19,9 +19,15 @@ resource "google_project_iam_member" "sa_registryapi_service_account_user_role" 
 resource "google_project_iam_member" "sa_registryapi_firestore_role" {
   project     = var.google_project_id
   role        = "roles/datastore.viewer"
-  member        = "serviceAccount:${google_service_account.sa_registryapi.email}"
+  member      = "serviceAccount:${google_service_account.sa_registryapi.email}"
 }
- 
+
+resource "google_project_iam_member" "sa_registryapi_pubsub_role" {
+  project     = var.google_project_id
+  role        = "roles/pubsub.editor"
+  member      = "serviceAccount:${google_service_account.sa_registryapi.email}"
+}
+
 output "sa_registryapi" {
   value = google_service_account.sa_registryapi
 }

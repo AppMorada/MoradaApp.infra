@@ -81,6 +81,10 @@ module "cloudrun" {
   depends_on                          = [ module.iam, module.secret_manager ]
 }
 
+module "pubsub" {
+  source          = "./pub-sub"
+}
+
 module "cloudbuild" {
   source                        = "./cloud-build"
   sa_function_manager_id        = module.iam.sa_function_manager.id

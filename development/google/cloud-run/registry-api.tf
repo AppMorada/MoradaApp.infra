@@ -33,9 +33,12 @@ resource "google_cloud_run_service" "registry_api" {
       labels = {
         type = "cloud-run"
         service = "registry-api"
+        "client.knative.dev/nonce" = "eyoysutmka"
         mode = "development"
       }
       annotations = {
+        "run.googleapis.com/client-name"  = "gcloud"
+        "run.googleapis.com/client-version" = "475.0.0"
         "autoscaling.knative.dev/minScale" = "0"
         "autoscaling.knative.dev/maxScale" = "1"
         "run.googleapis.com/startup-cpu-boost" = "true"
@@ -68,6 +71,11 @@ resource "google_cloud_run_service" "registry_api" {
               key = "latest"
             }
           }
+        }
+
+        env {
+          name = "GOOGLE_CLOUD_PROJECT"
+          value = var.google_project_id
         }
 
         env {

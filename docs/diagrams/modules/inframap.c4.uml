@@ -123,18 +123,6 @@ System_Boundary(events_manager, "Módulo de gestão de eventos") {
 }
 
 
-System_Boundary(help_desk, "Módulo de help desk") {
-   Container(help_desk_api, "API de help desk", "Nest.js", "Serviço dedicado a gerenciar o suporte ao usuário com o software", $sprite="nestjs")
-   ContainerDb(help_desk_db, "Repositório do help desk", "Firestore", "Banco de dados dedicado a armazenar informações sobre o suporte ao usuário", $sprite="CloudFirestore,scale=0.35")
-
-   Rel(web, help_desk_api, "Envia tickets e solicita suporte em", "HTTP/JSON")
-   Rel(mobile, help_desk_api, "Envia tickets e solicita suporte em", "HTTP/JSON")
-
-   Rel(help_desk_api, help_desk_db, "Armazena tickets em", "GRPC")
-   Rel(help_desk_api, email_func, "Notifica o usuário em", "HTTP/JSON")
-}
-
-
 System_Boundary(booking, "Módulo de reserva de espaços") {
    Container(booking_api, "API de reserva de espaços", "Serviço dedicado a gerenciar as reservas de espaços dos usuários", $sprite="nestjs")
    ContainerDb(booking_db, "Repositório de reserva de espaços", "Firestore", "Banco de dados dedicado a armazenar informações sobre as reservas de espaços", $sprite="CloudFirestore,scale=0.35")

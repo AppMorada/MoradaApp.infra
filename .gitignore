@@ -2,3 +2,4 @@
 *.lock*
 *.tfvars
 *.terraform
+.secrets/
